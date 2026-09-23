@@ -10,6 +10,12 @@ namespace IdleTerraria.Api.Entities
         [Column("id")]
         public Guid Id { get; set; }
 
+        [Column("account_id")]
+        public Guid AccountId { get; set; }
+
+        [ForeignKey(nameof(AccountId))]
+        public Account Account { get; set; } = null!;
+
         [Column("username")]
         [StringLength(20)]
         public string Username { get; set; } = string.Empty;

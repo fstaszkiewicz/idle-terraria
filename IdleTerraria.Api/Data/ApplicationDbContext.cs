@@ -10,6 +10,9 @@ namespace IdleTerraria.Api.Data
         {
         }
 
+        // Konta
+        public DbSet<Account> Accounts { get; set; }
+
         // Aktywności i Profesje Gracza
         public DbSet<Player> Players { get; set; }
         public DbSet<PlayerStats> PlayerStats { get; set; }
@@ -36,9 +39,20 @@ namespace IdleTerraria.Api.Data
         public DbSet<WanderingShopStock> WanderingShopStocks { get; set; }
         public DbSet<PvpLog> PvpLogs { get; set; }
 
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+
+            modelBuilder.Entity<Account>()
+                .HasOne(a => a.Player)
+                .WithOne(p => p.Account)
+                .HasForeignKey<Player>(p => p.AccountId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<Account>()
+                .HasIndex(a => a.Email)
+                .IsUnique();
 
             modelBuilder.Entity<PvpLog>()
                 .HasOne(p => p.Attacker)
@@ -69,6 +83,7 @@ namespace IdleTerraria.Api.Data
                 .WithMany()
                 .HasForeignKey(l => l.PetInvId)
                 .OnDelete(DeleteBehavior.Restrict);
+
         }
     }
 }

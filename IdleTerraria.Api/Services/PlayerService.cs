@@ -36,7 +36,8 @@ namespace IdleTerraria.Api.Services
                 // Zabezpieczenie gdyby gracz nie miał jeszcze rekordu statystyk
                 Strength = player.Stats?.StatStrength ?? 0,
                 Dexterity = player.Stats?.StatDexterity ?? 0,
-                Luck = player.Stats?.StatLuck ?? 0
+                Luck = player.Stats?.StatLuck ?? 0,
+                Vitality = player.Stats?.StatVitality ?? 0
             };
         }
     }
