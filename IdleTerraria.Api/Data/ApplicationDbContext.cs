@@ -54,6 +54,10 @@ namespace IdleTerraria.Api.Data
                 .HasIndex(a => a.Email)
                 .IsUnique();
 
+            modelBuilder.Entity<Player>()
+                .HasIndex(p => p.Username)
+                .IsUnique();
+
             modelBuilder.Entity<PvpLog>()
                 .HasOne(p => p.Attacker)
                 .WithMany()

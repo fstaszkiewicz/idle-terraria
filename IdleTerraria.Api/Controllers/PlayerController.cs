@@ -1,10 +1,13 @@
-﻿using IdleTerraria.Api.Services;
+﻿using System.IdentityModel.Tokens.Jwt;
+using IdleTerraria.Api.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace IdleTerraria.Api.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")] 
+    [Authorize]
+    [Route("api/[controller]")]
     public class PlayerController : ControllerBase
     {
         private readonly IPlayerService _playerService;
@@ -14,18 +17,31 @@ namespace IdleTerraria.Api.Controllers
             _playerService = playerService;
         }
 
-        // GET: /api/player/{id}
-        [HttpGet("{id}")]
-        public async Task<IActionResult> GetProfile(Guid id)
+        [HttpGet("me")]
+        public async Task<IActionResult> GetCurrentProfile()
         {
-            var profile = await _playerService.GetPlayerProfileAsync(id);
+            var playerIdClaim = User.FindFirst("player_id")?.Value;
+
+            if (!Guid.TryParse(playerIdClaim, out var playerId))
+            {
+                return Unauthorized(new
+                {
+                    Message = "Token nie zawiera poprawnego identyfikatora gracza."
+                });
+            }
+
+            var profile = await _playerService
+                .GetPlayerProfileAsync(playerId);
 
             if (profile == null)
             {
-                return NotFound(new { Message = "Gracz nie został znaleziony." });
+                return NotFound(new
+                {
+                    Message = "Profil gracza nie został znaleziony."
+                });
             }
 
-            return Ok(profile); // Zwraca HTTP 200 OK wraz z JSONem
+            return Ok(profile);
         }
     }
 }
