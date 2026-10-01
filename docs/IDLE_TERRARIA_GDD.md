@@ -2315,13 +2315,13 @@ Status: **częściowo zrealizowany**
 
 Status: **do zrealizowania**
 
-- [ ] Rozpoczynanie aktywności.
-- [ ] Zatrzymywanie aktywności.
-- [ ] Batching Idle.
+- [x] Rozpoczynanie aktywności.
+- [x] Zatrzymywanie aktywności.
+- [x] Batching Idle.
 - [ ] Przyznawanie złota i EXP.
-- [ ] Krzywa poziomów.
-- [ ] Limit przechowywania nagród.
-- [ ] Ochrona przed podwójną wypłatą.
+- [x] Krzywa poziomów.
+- [x] Limit przechowywania nagród.
+- [x] Ochrona przed podwójną wypłatą.
 - [ ] Pierwszy biom.
 - [ ] Podstawowa pula przeciwników.
 

@@ -1,4 +1,6 @@
-﻿using IdleTerraria.Api.DTOs.Responses;
+﻿using System;
+using System.Threading.Tasks;
+using IdleTerraria.Api.DTOs.Responses;
 
 namespace IdleTerraria.Api.Services
 {

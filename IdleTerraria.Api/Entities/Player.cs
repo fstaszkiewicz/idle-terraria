@@ -44,8 +44,9 @@ namespace IdleTerraria.Api.Entities
         [Column("stats_bought_n")]
         public int StatsBoughtN { get; set; }
 
-        
-        // Relacja 1 do 1
+        [Column("skill_points")]
+        public int SkillPoints { get; set; }
+
         public PlayerStats? Stats { get; set; }
     }
 }

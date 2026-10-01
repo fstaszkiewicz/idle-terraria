@@ -1,8 +1,10 @@
 using System.Text;
+using MediatR;
 using IdleTerraria.Api.Data;
 using IdleTerraria.Api.Entities;
 using IdleTerraria.Api.Security;
 using IdleTerraria.Api.Services;
+using IdleTerraria.Api.Options;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -21,9 +23,18 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 builder.Services.Configure<JwtOptions>(
     builder.Configuration.GetSection(JwtOptions.SectionName));
 
+builder.Services.Configure<GameRulesOptions>(
+    builder.Configuration.GetSection(GameRulesOptions.SectionName));
+
+builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(Program).Assembly));
+
+builder.Services.AddScoped<IPlayerProgressionService, PlayerProgressionService>();
+builder.Services.AddScoped<IHuntingService, HuntingService>();
+
 builder.Services.AddScoped<IPlayerService, PlayerService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
+
 
 builder.Services.AddScoped<
     IPasswordHasher<Account>,
