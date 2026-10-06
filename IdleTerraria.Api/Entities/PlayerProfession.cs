@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 namespace IdleTerraria.Api.Entities
 {
     [Table("player_professions")]
-    [PrimaryKey(nameof(PlayerId), nameof(ProfessionType))] 
+    [PrimaryKey(nameof(PlayerId), nameof(ProfessionType))]
     public class PlayerProfession
     {
         [Column("player_id")]

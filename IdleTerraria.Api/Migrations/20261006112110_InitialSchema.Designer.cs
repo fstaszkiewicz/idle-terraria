@@ -13,8 +13,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace IdleTerraria.Api.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260921074151_CompleteSchema")]
-    partial class CompleteSchema
+    [Migration("20261006112110_InitialSchema")]
+    partial class InitialSchema
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -25,6 +25,106 @@ namespace IdleTerraria.Api.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
+
+            modelBuilder.Entity("IdleTerraria.Api.Entities.Account", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)")
+                        .HasColumnName("email");
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("password_hash");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Email")
+                        .IsUnique();
+
+                    b.ToTable("accounts");
+                });
+
+            modelBuilder.Entity("IdleTerraria.Api.Entities.Biome", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("code");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<int?>("MaximumLevel")
+                        .HasColumnType("integer")
+                        .HasColumnName("maximum_level");
+
+                    b.Property<int>("MinimumLevel")
+                        .HasColumnType("integer")
+                        .HasColumnName("minimum_level");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("biomes", t =>
+                        {
+                            t.HasCheckConstraint("CK_biomes_maximum_level_valid", "\"maximum_level\" IS NULL OR \"maximum_level\" >= \"minimum_level\"");
+
+                            t.HasCheckConstraint("CK_biomes_minimum_level_non_negative", "\"minimum_level\" >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("IdleTerraria.Api.Entities.BiomeMob", b =>
+                {
+                    b.Property<int>("BiomeId")
+                        .HasColumnType("integer")
+                        .HasColumnName("biome_id");
+
+                    b.Property<int>("MobTemplateId")
+                        .HasColumnType("integer")
+                        .HasColumnName("mob_template_id");
+
+                    b.Property<int>("SpawnWeight")
+                        .HasColumnType("integer")
+                        .HasColumnName("spawn_weight");
+
+                    b.HasKey("BiomeId", "MobTemplateId");
+
+                    b.HasIndex("MobTemplateId");
+
+                    b.ToTable("biome_mobs", t =>
+                        {
+                            t.HasCheckConstraint("CK_biome_mobs_spawn_weight_positive", "\"spawn_weight\" > 0");
+                        });
+                });
 
             modelBuilder.Entity("IdleTerraria.Api.Entities.HeadquarterNpc", b =>
                 {
@@ -72,8 +172,10 @@ namespace IdleTerraria.Api.Migrations
                         .HasColumnName("player_id");
 
                     b.Property<string>("Prefix")
+                        .ValueGeneratedOnAdd()
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)")
+                        .HasDefaultValue("Normal")
                         .HasColumnName("prefix");
 
                     b.Property<int>("Quantity")
@@ -94,7 +196,12 @@ namespace IdleTerraria.Api.Migrations
 
                     b.HasIndex("TemplateId");
 
-                    b.ToTable("inventory");
+                    b.ToTable("inventory", t =>
+                        {
+                            t.HasCheckConstraint("CK_inventory_quantity_positive", "\"quantity\" > 0");
+
+                            t.HasCheckConstraint("CK_inventory_upgrade_level_range", "\"upgrade_level\" >= 0 AND \"upgrade_level\" <= 10");
+                        });
                 });
 
             modelBuilder.Entity("IdleTerraria.Api.Entities.ItemCategory", b =>
@@ -106,19 +213,66 @@ namespace IdleTerraria.Api.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("code");
+
                     b.Property<bool>("Equipable")
                         .HasColumnType("boolean")
                         .HasColumnName("equipable");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
                         .HasColumnName("name");
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Code")
+                        .IsUnique();
+
                     b.ToTable("item_categories");
+                });
+
+            modelBuilder.Entity("IdleTerraria.Api.Entities.ItemCombatProfile", b =>
+                {
+                    b.Property<int>("ItemTemplateId")
+                        .HasColumnType("integer")
+                        .HasColumnName("item_template_id");
+
+                    b.Property<int>("ArmorPenetration")
+                        .HasColumnType("integer")
+                        .HasColumnName("armor_penetration");
+
+                    b.Property<decimal>("AttackIntervalSeconds")
+                        .HasPrecision(10, 3)
+                        .HasColumnType("numeric(10,3)")
+                        .HasColumnName("attack_interval_seconds");
+
+                    b.Property<int>("BaseDamage")
+                        .HasColumnType("integer")
+                        .HasColumnName("base_damage");
+
+                    b.Property<decimal>("CriticalChance")
+                        .HasPrecision(5, 4)
+                        .HasColumnType("numeric(5,4)")
+                        .HasColumnName("critical_chance");
+
+                    b.HasKey("ItemTemplateId");
+
+                    b.ToTable("item_combat_profiles", t =>
+                        {
+                            t.HasCheckConstraint("CK_item_combat_profiles_armor_penetration_non_negative", "\"armor_penetration\" >= 0");
+
+                            t.HasCheckConstraint("CK_item_combat_profiles_attack_interval_positive", "\"attack_interval_seconds\" > 0");
+
+                            t.HasCheckConstraint("CK_item_combat_profiles_base_damage_non_negative", "\"base_damage\" >= 0");
+
+                            t.HasCheckConstraint("CK_item_combat_profiles_critical_chance_range", "\"critical_chance\" >= 0 AND \"critical_chance\" <= 1");
+                        });
                 });
 
             modelBuilder.Entity("IdleTerraria.Api.Entities.ItemTemplate", b =>
@@ -130,17 +284,27 @@ namespace IdleTerraria.Api.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<decimal>("AttackSpeed")
-                        .HasColumnType("numeric")
-                        .HasColumnName("attack_speed");
-
-                    b.Property<int>("BaseValue")
-                        .HasColumnType("integer")
+                    b.Property<long>("BaseValue")
+                        .HasColumnType("bigint")
                         .HasColumnName("base_value");
 
-                    b.Property<int?>("CategoryId")
+                    b.Property<int>("CategoryId")
                         .HasColumnType("integer")
                         .HasColumnName("category_id");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("code");
+
+                    b.Property<bool>("IsTradable")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_tradable");
+
+                    b.Property<int>("MaxStackSize")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_stack_size");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -154,9 +318,19 @@ namespace IdleTerraria.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CategoryId");
+                    b.HasIndex("Code")
+                        .IsUnique();
 
-                    b.ToTable("item_templates");
+                    b.HasIndex("CategoryId", "Tier");
+
+                    b.ToTable("item_templates", t =>
+                        {
+                            t.HasCheckConstraint("CK_item_templates_base_value_non_negative", "\"base_value\" >= 0");
+
+                            t.HasCheckConstraint("CK_item_templates_max_stack_size_positive", "\"max_stack_size\" > 0");
+
+                            t.HasCheckConstraint("CK_item_templates_tier_range", "\"tier\" >= 1 AND \"tier\" <= 12");
+                        });
                 });
 
             modelBuilder.Entity("IdleTerraria.Api.Entities.Loadout", b =>
@@ -201,12 +375,113 @@ namespace IdleTerraria.Api.Migrations
                     b.ToTable("loadouts");
                 });
 
+            modelBuilder.Entity("IdleTerraria.Api.Entities.MobLootDrop", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("DropChance")
+                        .HasPrecision(5, 4)
+                        .HasColumnType("numeric(5,4)")
+                        .HasColumnName("drop_chance");
+
+                    b.Property<int>("ItemTemplateId")
+                        .HasColumnType("integer")
+                        .HasColumnName("item_template_id");
+
+                    b.Property<int>("MaximumQuantity")
+                        .HasColumnType("integer")
+                        .HasColumnName("maximum_quantity");
+
+                    b.Property<int>("MinimumQuantity")
+                        .HasColumnType("integer")
+                        .HasColumnName("minimum_quantity");
+
+                    b.Property<int>("MobTemplateId")
+                        .HasColumnType("integer")
+                        .HasColumnName("mob_template_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ItemTemplateId");
+
+                    b.HasIndex("MobTemplateId", "ItemTemplateId")
+                        .IsUnique();
+
+                    b.ToTable("mob_loot_drops", t =>
+                        {
+                            t.HasCheckConstraint("CK_mob_loot_drops_drop_chance_range", "\"drop_chance\" >= 0 AND \"drop_chance\" <= 1");
+
+                            t.HasCheckConstraint("CK_mob_loot_drops_quantity_range", "\"minimum_quantity\" > 0 AND \"maximum_quantity\" >= \"minimum_quantity\"");
+                        });
+                });
+
+            modelBuilder.Entity("IdleTerraria.Api.Entities.MobTemplate", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BaseExperience")
+                        .HasColumnType("integer")
+                        .HasColumnName("base_experience");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("code");
+
+                    b.Property<int>("Level")
+                        .HasColumnType("integer")
+                        .HasColumnName("level");
+
+                    b.Property<long>("MaximumGold")
+                        .HasColumnType("bigint")
+                        .HasColumnName("maximum_gold");
+
+                    b.Property<long>("MinimumGold")
+                        .HasColumnType("bigint")
+                        .HasColumnName("minimum_gold");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("mob_templates", t =>
+                        {
+                            t.HasCheckConstraint("CK_mob_templates_base_experience_non_negative", "\"base_experience\" >= 0");
+
+                            t.HasCheckConstraint("CK_mob_templates_gold_range_valid", "\"minimum_gold\" >= 0 AND \"maximum_gold\" >= \"minimum_gold\"");
+
+                            t.HasCheckConstraint("CK_mob_templates_level_positive", "\"level\" > 0");
+                        });
+                });
+
             modelBuilder.Entity("IdleTerraria.Api.Entities.Player", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("account_id");
 
                     b.Property<int>("ArenaElo")
                         .HasColumnType("integer")
@@ -232,6 +507,10 @@ namespace IdleTerraria.Api.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("level");
 
+                    b.Property<int>("SkillPoints")
+                        .HasColumnType("integer")
+                        .HasColumnName("skill_points");
+
                     b.Property<int>("Stardust")
                         .HasColumnType("integer")
                         .HasColumnName("stardust");
@@ -247,6 +526,12 @@ namespace IdleTerraria.Api.Migrations
                         .HasColumnName("username");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("AccountId")
+                        .IsUnique();
+
+                    b.HasIndex("Username")
+                        .IsUnique();
 
                     b.ToTable("players");
                 });
@@ -529,6 +814,25 @@ namespace IdleTerraria.Api.Migrations
                     b.ToTable("wandering_shop_stock");
                 });
 
+            modelBuilder.Entity("IdleTerraria.Api.Entities.BiomeMob", b =>
+                {
+                    b.HasOne("IdleTerraria.Api.Entities.Biome", "Biome")
+                        .WithMany("MobPool")
+                        .HasForeignKey("BiomeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("IdleTerraria.Api.Entities.MobTemplate", "MobTemplate")
+                        .WithMany("Biomes")
+                        .HasForeignKey("MobTemplateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Biome");
+
+                    b.Navigation("MobTemplate");
+                });
+
             modelBuilder.Entity("IdleTerraria.Api.Entities.HeadquarterNpc", b =>
                 {
                     b.HasOne("IdleTerraria.Api.Entities.Player", "Player")
@@ -542,22 +846,37 @@ namespace IdleTerraria.Api.Migrations
                 {
                     b.HasOne("IdleTerraria.Api.Entities.Player", "Player")
                         .WithMany()
-                        .HasForeignKey("PlayerId");
+                        .HasForeignKey("PlayerId")
+                        .OnDelete(DeleteBehavior.Cascade);
 
                     b.HasOne("IdleTerraria.Api.Entities.ItemTemplate", "Template")
                         .WithMany()
-                        .HasForeignKey("TemplateId");
+                        .HasForeignKey("TemplateId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Player");
 
                     b.Navigation("Template");
                 });
 
+            modelBuilder.Entity("IdleTerraria.Api.Entities.ItemCombatProfile", b =>
+                {
+                    b.HasOne("IdleTerraria.Api.Entities.ItemTemplate", "ItemTemplate")
+                        .WithOne("CombatProfile")
+                        .HasForeignKey("IdleTerraria.Api.Entities.ItemCombatProfile", "ItemTemplateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ItemTemplate");
+                });
+
             modelBuilder.Entity("IdleTerraria.Api.Entities.ItemTemplate", b =>
                 {
                     b.HasOne("IdleTerraria.Api.Entities.ItemCategory", "Category")
-                        .WithMany()
-                        .HasForeignKey("CategoryId");
+                        .WithMany("ItemTemplates")
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.Navigation("Category");
                 });
@@ -590,6 +909,36 @@ namespace IdleTerraria.Api.Migrations
                     b.Navigation("Player");
 
                     b.Navigation("Weapon");
+                });
+
+            modelBuilder.Entity("IdleTerraria.Api.Entities.MobLootDrop", b =>
+                {
+                    b.HasOne("IdleTerraria.Api.Entities.ItemTemplate", "ItemTemplate")
+                        .WithMany("LootDrops")
+                        .HasForeignKey("ItemTemplateId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("IdleTerraria.Api.Entities.MobTemplate", "MobTemplate")
+                        .WithMany("LootDrops")
+                        .HasForeignKey("MobTemplateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ItemTemplate");
+
+                    b.Navigation("MobTemplate");
+                });
+
+            modelBuilder.Entity("IdleTerraria.Api.Entities.Player", b =>
+                {
+                    b.HasOne("IdleTerraria.Api.Entities.Account", "Account")
+                        .WithOne("Player")
+                        .HasForeignKey("IdleTerraria.Api.Entities.Player", "AccountId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Account");
                 });
 
             modelBuilder.Entity("IdleTerraria.Api.Entities.PlayerActivityState", b =>
@@ -713,6 +1062,35 @@ namespace IdleTerraria.Api.Migrations
                         .HasForeignKey("TemplateId");
 
                     b.Navigation("Template");
+                });
+
+            modelBuilder.Entity("IdleTerraria.Api.Entities.Account", b =>
+                {
+                    b.Navigation("Player");
+                });
+
+            modelBuilder.Entity("IdleTerraria.Api.Entities.Biome", b =>
+                {
+                    b.Navigation("MobPool");
+                });
+
+            modelBuilder.Entity("IdleTerraria.Api.Entities.ItemCategory", b =>
+                {
+                    b.Navigation("ItemTemplates");
+                });
+
+            modelBuilder.Entity("IdleTerraria.Api.Entities.ItemTemplate", b =>
+                {
+                    b.Navigation("CombatProfile");
+
+                    b.Navigation("LootDrops");
+                });
+
+            modelBuilder.Entity("IdleTerraria.Api.Entities.MobTemplate", b =>
+                {
+                    b.Navigation("Biomes");
+
+                    b.Navigation("LootDrops");
                 });
 
             modelBuilder.Entity("IdleTerraria.Api.Entities.Player", b =>

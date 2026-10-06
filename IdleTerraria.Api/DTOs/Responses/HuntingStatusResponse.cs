@@ -7,7 +7,6 @@
         public DateTime? StartedAt { get; set; }
         public DateTime? LastClaimedAt { get; set; }
 
-    
         public double SecondsSinceLastClaim { get; set; }
     }
 }

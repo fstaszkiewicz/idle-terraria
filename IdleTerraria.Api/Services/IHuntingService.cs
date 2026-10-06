@@ -1,16 +1,24 @@
 ﻿using IdleTerraria.Api.DTOs.Requests;
 using IdleTerraria.Api.DTOs.Responses;
 
-namespace IdleTerraria.Api.Services
+namespace IdleTerraria.Api.Services;
+
+public interface IHuntingService
 {
-    public interface IHuntingService
-    {
-        Task<HuntingStatusResponse> GetStatusAsync(System.Guid playerId);
+    Task<HuntingStatusResponse> GetStatusAsync(
+        Guid playerId,
+        CancellationToken cancellationToken = default);
 
-        Task<HuntingStatusResponse> StartHuntingAsync(System.Guid playerId, StartHuntingRequest request);
+    Task<HuntingStatusResponse> StartHuntingAsync(
+        Guid playerId,
+        StartHuntingRequest request,
+        CancellationToken cancellationToken = default);
 
-        Task<HuntingClaimResponse> ClaimRewardsAsync(System.Guid playerId);
+    Task<HuntingClaimResponse> ClaimRewardsAsync(
+        Guid playerId,
+        CancellationToken cancellationToken = default);
 
-        Task<HuntingClaimResponse> StopHuntingAsync(System.Guid playerId);
-    }
+    Task<HuntingClaimResponse> StopHuntingAsync(
+        Guid playerId,
+        CancellationToken cancellationToken = default);
 }

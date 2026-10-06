@@ -22,14 +22,12 @@ namespace IdleTerraria.Api.Handlers
         {
             notification.Player.SkillPoints += 1;
 
-
             _logger.LogInformation(
                 "Gracz {PlayerId} osiągnął {NewLevel} poziom i otrzymał 1 punkt umiejętności. (Obecnie: {SkillPoints})",
                 notification.Player.Id,
                 notification.NewLevel,
                 notification.Player.SkillPoints);
-
-            await Task.CompletedTask; 
+            await Task.CompletedTask;
         }
     }
 }
