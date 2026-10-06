@@ -1,10 +1,12 @@
 ﻿using IdleTerraria.Api.Data;
+using IdleTerraria.Api.DTOs.Responses;
 using IdleTerraria.Api.Entities;
 using IdleTerraria.Api.Options;
 using IdleTerraria.Api.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Npgsql;
 using Xunit;
 
 namespace IdleTerraria.IntegrationTests;
@@ -17,125 +19,191 @@ public sealed class HuntingServiceConcurrencyTests
     [Fact]
     public async Task Concurrent_claims_should_pay_the_same_elapsed_time_only_once()
     {
-        var connectionString =
+        var rootConnectionString =
             Environment.GetEnvironmentVariable(
                 "IDLE_TERRARIA_TEST_CONNECTION_STRING");
 
-        if (string.IsNullOrWhiteSpace(connectionString))
+        if (string.IsNullOrWhiteSpace(rootConnectionString))
         {
             throw new InvalidOperationException(
                 "Brak zmiennej środowiskowej " +
                 "IDLE_TERRARIA_TEST_CONNECTION_STRING.");
         }
 
+        var databaseName =
+            $"idle_terraria_concurrency_{Guid.NewGuid():N}";
+
+        var adminConnectionString =
+            new NpgsqlConnectionStringBuilder(rootConnectionString)
+            {
+                Database = "postgres"
+            }.ConnectionString;
+
+        var testConnectionString =
+            new NpgsqlConnectionStringBuilder(rootConnectionString)
+            {
+                Database = databaseName
+            }.ConnectionString;
+
         var playerId = Guid.NewGuid();
         var accountId = Guid.NewGuid();
         var startedAt = DateTime.UtcNow.AddSeconds(-3_700);
 
-        await using (var setupContext = CreateContext(connectionString))
+        try
         {
-            await setupContext.Database.EnsureDeletedAsync();
-            await setupContext.Database.EnsureCreatedAsync();
+            await CreateDatabaseAsync(
+                adminConnectionString,
+                databaseName);
 
-            await SeedWorldDataAsync(setupContext);
-
-            var account = new Account
+            await using (var setupContext =
+                CreateContext(testConnectionString))
             {
-                Id = accountId,
-                Email = $"{Guid.NewGuid():N}@example.test",
-                PasswordHash = "test-password-hash",
-                CreatedAt = DateTime.UtcNow
-            };
+                await setupContext.Database.MigrateAsync();
 
-            var player = new Player
+                await SeedWorldDataAsync(setupContext);
+
+                var account = new Account
+                {
+                    Id = accountId,
+                    Email = $"{Guid.NewGuid():N}@example.test",
+                    PasswordHash = "test-password-hash",
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                var player = new Player
+                {
+                    Id = playerId,
+                    AccountId = accountId,
+                    Account = account,
+                    Username = $"test_{Guid.NewGuid():N}"[..20],
+                    Level = 1,
+                    Experience = 0,
+                    Gold = 0,
+                    Stardust = 0,
+                    Energy = 100,
+                    ArenaElo = 1200,
+                    StatsBoughtN = 0,
+                    SkillPoints = 0
+                };
+
+                var activity = new PlayerActivityState
+                {
+                    PlayerId = playerId,
+                    ActivityType = "Hunting",
+                    BiomeId = 1,
+                    StartedAt = startedAt,
+                    LastBatchCalculatedAt = startedAt
+                };
+
+                setupContext.Accounts.Add(account);
+                setupContext.Players.Add(player);
+                setupContext.PlayerActivityStates.Add(activity);
+
+                await setupContext.SaveChangesAsync();
+            }
+
+            var rules = Options.Create(new GameRulesOptions
             {
-                Id = playerId,
-                AccountId = accountId,
-                Account = account,
-                Username = $"test_{Guid.NewGuid():N}"[..20],
-                Level = 1,
-                Experience = 0,
-                Gold = 0,
-                Stardust = 0,
-                Energy = 100,
-                ArenaElo = 1200,
-                StatsBoughtN = 0,
-                SkillPoints = 0
-            };
+                MaxIdleHours = 24,
+                BaseHuntingCycleSeconds = BaseCycleSeconds,
+                BaseExpPerCycle = BaseExpPerCycle,
+                BaseExpRequirementForLevelUp = 10_000,
+                ExpRequirementMultiplier = 2
+            });
 
-            var activity = new PlayerActivityState
-            {
-                PlayerId = playerId,
-                ActivityType = "Hunting",
-                BiomeId = 1,
-                StartedAt = startedAt,
-                LastBatchCalculatedAt = startedAt
-            };
+            var firstTask = ClaimWithSeparateContextAsync(
+                testConnectionString,
+                playerId,
+                rules);
 
-            setupContext.Accounts.Add(account);
-            setupContext.Players.Add(player);
-            setupContext.PlayerActivityStates.Add(activity);
+            var secondTask = ClaimWithSeparateContextAsync(
+                testConnectionString,
+                playerId,
+                rules);
 
-            await setupContext.SaveChangesAsync();
+            var results = await Task.WhenAll(
+                firstTask,
+                secondTask);
+
+            Assert.Equal(
+                BaseExpPerCycle,
+                results.Sum(result => result.ExperienceGained));
+
+            Assert.Contains(
+                results,
+                result => result.ExperienceGained == BaseExpPerCycle);
+
+            Assert.Contains(
+                results,
+                result => result.ExperienceGained == 0);
+
+            await using var verificationContext =
+                CreateContext(testConnectionString);
+
+            var savedPlayer = await verificationContext.Players
+                .SingleAsync(player => player.Id == playerId);
+
+            var savedActivity = await verificationContext.PlayerActivityStates
+                .SingleAsync(activity => activity.PlayerId == playerId);
+
+            var elapsedFromStart = savedActivity.LastBatchCalculatedAt - startedAt;
+
+            Assert.InRange(
+                elapsedFromStart.TotalSeconds,
+                BaseCycleSeconds - 0.001,
+                BaseCycleSeconds + 0.001);
+
+            Assert.Equal(BaseExpPerCycle, savedPlayer.Experience);
+
+            Assert.Equal(
+                startedAt.AddSeconds(BaseCycleSeconds),
+                savedActivity.LastBatchCalculatedAt,
+                TimeSpan.FromMilliseconds(1));
         }
-
-        var rules = Options.Create(new GameRulesOptions
+        finally
         {
-            MaxIdleHours = 24,
-            BaseHuntingCycleSeconds = BaseCycleSeconds,
-            BaseExpPerCycle = BaseExpPerCycle,
-            BaseExpRequirementForLevelUp = 10_000,
-            ExpRequirementMultiplier = 2
-        });
+            NpgsqlConnection.ClearAllPools();
 
-        var firstTask = ClaimWithSeparateContextAsync(
-            connectionString,
-            playerId,
-            rules);
+            await DropDatabaseAsync(
+                adminConnectionString,
+                databaseName);
+        }
+    }
 
-        var secondTask = ClaimWithSeparateContextAsync(
-            connectionString,
-            playerId,
-            rules);
+    private static async Task CreateDatabaseAsync(
+        string adminConnectionString,
+        string databaseName)
+    {
+        await using var connection =
+            new NpgsqlConnection(adminConnectionString);
 
-        var results = await Task.WhenAll(
-            firstTask,
-            secondTask);
+        await connection.OpenAsync();
 
-        Assert.Equal(
-            BaseExpPerCycle,
-            results.Sum(result => result.ExperienceGained));
+        await using var command =
+            connection.CreateCommand();
 
-        Assert.Contains(
-            results,
-            result => result.ExperienceGained == BaseExpPerCycle);
+        command.CommandText =
+            $"CREATE DATABASE \"{databaseName}\"";
 
-        Assert.Contains(
-            results,
-            result => result.ExperienceGained == 0);
+        await command.ExecuteNonQueryAsync();
+    }
 
-        await using var verificationContext =
-            CreateContext(connectionString);
+    private static async Task DropDatabaseAsync(
+        string adminConnectionString,
+        string databaseName)
+    {
+        await using var connection =
+            new NpgsqlConnection(adminConnectionString);
 
-        var savedPlayer = await verificationContext.Players
-            .SingleAsync(player => player.Id == playerId);
+        await connection.OpenAsync();
 
-        var savedActivity = await verificationContext.PlayerActivityStates
-            .SingleAsync(activity => activity.PlayerId == playerId);
+        await using var command =
+            connection.CreateCommand();
 
-        var elapsedFromStart = savedActivity.LastBatchCalculatedAt - startedAt;
+        command.CommandText =
+            $"DROP DATABASE IF EXISTS \"{databaseName}\" WITH (FORCE)";
 
-        Assert.InRange(
-            elapsedFromStart.TotalSeconds,
-            BaseCycleSeconds - 0.001,
-            BaseCycleSeconds + 0.001);
-
-        Assert.Equal(BaseExpPerCycle, savedPlayer.Experience);
-
-        Assert.Equal(
-            startedAt.AddSeconds(BaseCycleSeconds),
-            savedActivity.LastBatchCalculatedAt,
-            TimeSpan.FromMilliseconds(1));
+        await command.ExecuteNonQueryAsync();
     }
 
     private static async Task SeedWorldDataAsync(ApplicationDbContext context)
@@ -143,14 +211,16 @@ public sealed class HuntingServiceConcurrencyTests
         var category = new ItemCategory
         {
             Id = 1,
-            Name = "Materials",
+            Code = "MATERIAL",
+            Name = "Material",
             Equipable = false
         };
 
         var itemTemplate = new ItemTemplate
         {
             Id = 1,
-            CategoryId = 1,
+            CategoryId = category.Id,
+            Category = category,
             Code = "ITEM_GEL",
             Name = "Gel",
             Tier = 1,
@@ -180,15 +250,19 @@ public sealed class HuntingServiceConcurrencyTests
 
         var biomeMob = new BiomeMob
         {
-            BiomeId = 1,
-            MobTemplateId = 1,
-            SpawnWeight = 100
+            BiomeId = biome.Id,
+            MobTemplateId = mobTemplate.Id,
+            SpawnWeight = 100,
+            Biome = biome,
+            MobTemplate = mobTemplate
         };
 
         var lootDrop = new MobLootDrop
         {
-            MobTemplateId = 1,
-            ItemTemplateId = 1,
+            MobTemplateId = mobTemplate.Id,
+            ItemTemplateId = itemTemplate.Id,
+            MobTemplate = mobTemplate,
+            ItemTemplate = itemTemplate,
             DropChance = 1.0m,
             MinimumQuantity = 1,
             MaximumQuantity = 2
@@ -215,7 +289,7 @@ public sealed class HuntingServiceConcurrencyTests
             new TestPlayerProgressionService();
 
         var randomSource = new GameRandomSource();
-        var rewardCalculator = new HuntingRewardService(randomSource);
+        var rewardCalculator = new HuntingRewardCalculator(randomSource);
 
         var service = new HuntingService(
             context,
@@ -229,6 +303,9 @@ public sealed class HuntingServiceConcurrencyTests
 
         return new HuntingClaimResult(
             response.ExperienceGained,
+            response.GoldGained,
+            response.DefeatedEnemies,
+            response.Loot,
             response.CurrentStatus.LastClaimedAt);
     }
 
@@ -245,6 +322,9 @@ public sealed class HuntingServiceConcurrencyTests
 
     private sealed record HuntingClaimResult(
         int ExperienceGained,
+        long GoldGained,
+        int DefeatedEnemies,
+        IReadOnlyCollection<HuntingLootResponse> Loot,
         DateTime? LastClaimedAt);
 
     private sealed class TestPlayerProgressionService

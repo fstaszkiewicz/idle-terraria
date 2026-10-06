@@ -3,5 +3,8 @@
     <File Path="docs/IDLE_TERRARIA_GDD.md" />
   </Folder>
   <Project Path="IdleTerraria.Api/IdleTerraria.Api.csproj" />
+  <Folder Name="/tests/">
+    <Project Path="tests/IdleTerraria.IntegrationTests/IdleTerraria.IntegrationTests.csproj" />
+  </Folder>
   <Project Path="IdleTerraria.Api.Tests/IdleTerraria.Api.Tests.csproj" />
 </Solution>

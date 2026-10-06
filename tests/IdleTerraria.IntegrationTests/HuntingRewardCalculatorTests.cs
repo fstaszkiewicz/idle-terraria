@@ -1,5 +1,6 @@
 using IdleTerraria.Api.Entities;
 using IdleTerraria.Api.Services;
+using Xunit;
 
 namespace IdleTerraria.IntegrationTests;
 
@@ -48,7 +49,12 @@ public sealed class HuntingRewardCalculatorTests
         };
 
         var random = new SequenceRandomSource(
-            ints: [0, 1, 2],
+            ints:
+            [
+                0, 1, // cykl 1: mob (indeks/waga)
+                0, 1, // cykl 2: mob (indeks/waga)
+                0, 1  // cykl 3: mob (indeks/waga)
+            ],
             longs: [4, 4, 4],
             doubles: [0.0, 0.0, 0.0]);
 
@@ -86,9 +92,15 @@ public sealed class HuntingRewardCalculatorTests
         }
 
         public int NextInt(
-            int minInclusive,
-            int maxExclusive)
+    int minInclusive,
+    int maxExclusive)
         {
+            if (_ints.Count == 0)
+            {
+                throw new InvalidOperationException(
+                    "Brak zaplanowanej wartości int w SequenceRandomSource.");
+            }
+
             var value = _ints.Dequeue();
 
             Assert.InRange(
@@ -103,6 +115,12 @@ public sealed class HuntingRewardCalculatorTests
             long minInclusive,
             long maxExclusive)
         {
+            if (_longs.Count == 0)
+            {
+                throw new InvalidOperationException(
+                    "Brak zaplanowanej wartości long w SequenceRandomSource.");
+            }
+
             var value = _longs.Dequeue();
 
             Assert.InRange(
@@ -115,6 +133,12 @@ public sealed class HuntingRewardCalculatorTests
 
         public double NextDouble()
         {
+            if (_doubles.Count == 0)
+            {
+                throw new InvalidOperationException(
+                    "Brak zaplanowanej wartości double w SequenceRandomSource.");
+            }
+
             return _doubles.Dequeue();
         }
     }
